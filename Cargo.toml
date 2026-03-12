@@ -1,0 +1,18 @@
+[package]
+name = "rt-ring"
+version = "0.1.0"
+edition = "2021"
+description = "Lock-free SPSC ring buffer with overwrite-oldest semantics for real-time applications"
+repository = ""
+keywords = ["ring-buffer", "spsc", "lock-free", "real-time", "audio"]
+categories = ["concurrency", "data-structures", "no-std"]
+
+[dev-dependencies]
+proptest = "1"
+criterion = { version = "0.5", features = ["html_reports"] }
+loom = "0.7"
+ringbuf = "0.4"
+
+[[bench]]
+name = "throughput"
+harness = false
