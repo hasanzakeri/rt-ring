@@ -26,6 +26,9 @@ fmt-check: .hooks-installed
 bench: .hooks-installed
 	$(DC) cargo bench
 
+test-loom: .hooks-installed
+	$(DC) cargo test --features loom-tests --test loom_spsc
+
 fuzz: .hooks-installed
 	$(DC) cargo +nightly fuzz run push_pop -- -max_total_time=600
 

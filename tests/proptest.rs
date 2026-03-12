@@ -67,4 +67,41 @@ proptest! {
             }
         }
     }
+
+    #[test]
+    fn tracks_available_and_overwrites_correctly(
+        capacity in 1usize..=64,
+        ops in prop::collection::vec(op_strategy(), 0..=if cfg!(miri) { 50 } else { 500 }),
+    ) {
+        let (p, c) = rt_ring::new(capacity);
+        let actual_cap = p.capacity();
+        let mut reference: VecDeque<f32> = VecDeque::new();
+        let mut expected_overwrites = 0u64;
+
+        for op in ops {
+            match op {
+                Op::Push(val) => {
+                    if reference.len() == actual_cap {
+                        expected_overwrites += 1;
+                        reference.pop_front();
+                    }
+                    reference.push_back(val);
+                    p.push(val);
+                }
+                Op::Pop => {
+                    let got = c.pop();
+                    let expected = reference.pop_front();
+                    match (got, expected) {
+                        (Some(g), Some(e)) => prop_assert_eq!(g.to_bits(), e.to_bits()),
+                        (None, None) => {}
+                        (g, e) => prop_assert!(false, "pop mismatch: got {:?}, expected {:?}", g, e),
+                    }
+                }
+            }
+
+            prop_assert_eq!(c.available(), reference.len());
+            prop_assert_eq!(p.available(), reference.len());
+            prop_assert_eq!(c.overwrite_count(), expected_overwrites);
+        }
+    }
 }
