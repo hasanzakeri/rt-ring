@@ -7,6 +7,9 @@ repository = ""
 keywords = ["ring-buffer", "spsc", "lock-free", "real-time", "audio"]
 categories = ["concurrency", "data-structures", "no-std"]
 
+[features]
+loom-tests = []
+
 [dev-dependencies]
 proptest = "1"
 criterion = { version = "0.5", features = ["html_reports"] }

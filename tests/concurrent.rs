@@ -101,7 +101,7 @@ fn slow_consumer_forces_overwrites() {
                     popped += 1;
 
                     // Slow down every 10 pops
-                    if popped % 10 == 0 {
+                    if popped.is_multiple_of(10) {
                         thread::yield_now();
                         thread::yield_now();
                     }
@@ -173,6 +173,114 @@ fn bursty_producer() {
 
         let overwrites = c.overwrite_count();
         assert_eq!(overwrites + popped, total as u64);
+    });
+
+    producer.join().unwrap();
+    consumer.join().unwrap();
+}
+
+#[test]
+fn steady_state_no_overwrite_when_consumer_keeps_up() {
+    use std::sync::mpsc;
+
+    let count: usize = if cfg!(miri) { 200 } else { 20_000 };
+    let (p, c) = rt_ring::new(128);
+
+    let (tx_ready, rx_ready) = mpsc::channel::<usize>();
+    let (tx_ack, rx_ack) = mpsc::channel::<()>();
+
+    let producer = thread::spawn(move || {
+        for i in 0..count {
+            p.push(i as f32);
+            tx_ready.send(i).unwrap();
+            rx_ack.recv().unwrap();
+        }
+    });
+
+    let consumer = thread::spawn(move || {
+        for expected in 0..count {
+            let produced = rx_ready.recv().unwrap();
+            assert_eq!(produced, expected);
+
+            let v = loop {
+                if let Some(v) = c.pop() {
+                    break v;
+                }
+                thread::yield_now();
+            };
+
+            assert_eq!(v as usize, expected);
+            tx_ack.send(()).unwrap();
+        }
+
+        assert_eq!(c.overwrite_count(), 0, "no overwrites expected in lockstep");
+        assert_eq!(c.available(), 0, "buffer should be drained");
+    });
+
+    producer.join().unwrap();
+    consumer.join().unwrap();
+}
+
+#[test]
+fn available_never_exceeds_capacity_under_pressure() {
+    let cap: usize = 32;
+    let total: usize = if cfg!(miri) { 3_000 } else { 300_000 };
+    let (p, c) = rt_ring::new(cap);
+    let actual_cap = p.capacity();
+
+    let barrier = Arc::new(Barrier::new(2));
+
+    let b = Arc::clone(&barrier);
+    let producer = thread::spawn(move || {
+        b.wait();
+        for i in 0..total {
+            p.push(i as f32);
+        }
+    });
+
+    let b = Arc::clone(&barrier);
+    let consumer = thread::spawn(move || {
+        b.wait();
+        let mut last: Option<usize> = None;
+        let mut popped = 0usize;
+
+        loop {
+            match c.pop() {
+                Some(v) => {
+                    let val = v as usize;
+                    if let Some(prev) = last {
+                        assert!(val > prev, "non-monotonic: prev={prev}, got={val}");
+                    }
+                    last = Some(val);
+                    popped += 1;
+
+                    let avail = c.available();
+                    assert!(
+                        avail <= actual_cap,
+                        "available {avail} exceeded capacity {actual_cap}"
+                    );
+
+                    if popped.is_multiple_of(4) {
+                        thread::yield_now();
+                    }
+                }
+                None => {
+                    let avail = c.available();
+                    assert!(
+                        avail <= actual_cap,
+                        "available {avail} exceeded capacity {actual_cap}"
+                    );
+                    if last == Some(total - 1) {
+                        break;
+                    }
+                    thread::yield_now();
+                }
+            }
+        }
+
+        let overwrites = c.overwrite_count() as usize;
+        assert!(overwrites > 0, "pressure test should produce overwrites");
+        assert_eq!(overwrites + popped, total);
     });
 
     producer.join().unwrap();

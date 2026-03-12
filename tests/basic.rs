@@ -1,5 +1,3 @@
-use rt_ring;
-
 #[test]
 fn empty_buffer_returns_none() {
     let (_p, c) = rt_ring::new(4);
