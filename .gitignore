@@ -3,3 +3,4 @@ Cargo.lock
 .hooks-installed
 /fuzz/artifacts/
 /fuzz/corpus/
+/fuzz/target/

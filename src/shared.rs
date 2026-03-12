@@ -1,11 +1,14 @@
 use std::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
+#[repr(align(64))]
+struct CachePadded<T>(T);
+
 pub(crate) struct Shared {
     data: Box<[AtomicU32]>,
     capacity: usize,
     mask: usize,
-    write_pos: AtomicUsize,
-    read_pos: AtomicUsize,
+    write_pos: CachePadded<AtomicUsize>,
+    read_pos: CachePadded<AtomicUsize>,
     overwrite_count: AtomicU64,
 }
 
@@ -19,16 +22,16 @@ impl Shared {
             data: data.into_boxed_slice(),
             capacity,
             mask,
-            write_pos: AtomicUsize::new(0),
-            read_pos: AtomicUsize::new(0),
+            write_pos: CachePadded(AtomicUsize::new(0)),
+            read_pos: CachePadded(AtomicUsize::new(0)),
             overwrite_count: AtomicU64::new(0),
         }
     }
 
     pub(crate) fn push(&self, sample: f32) {
-        let wp = self.write_pos.load(Ordering::Relaxed);
+        let wp = self.write_pos.0.load(Ordering::Relaxed);
         loop {
-            let rp = self.read_pos.load(Ordering::Acquire);
+            let rp = self.read_pos.0.load(Ordering::Acquire);
             if wp - rp < self.capacity {
                 break;
             }
@@ -36,6 +39,7 @@ impl Shared {
             // CAS avoids moving read_pos backwards if the consumer already advanced it.
             if self
                 .read_pos
+                .0
                 .compare_exchange_weak(rp, rp + 1, Ordering::Release, Ordering::Relaxed)
                 .is_ok()
             {
@@ -46,7 +50,7 @@ impl Shared {
         }
 
         self.data[wp & self.mask].store(sample.to_bits(), Ordering::Release);
-        self.write_pos.store(wp + 1, Ordering::Release);
+        self.write_pos.0.store(wp + 1, Ordering::Release);
     }
 
     pub(crate) fn push_slice(&self, samples: &[f32]) {
@@ -57,8 +61,8 @@ impl Shared {
 
     pub(crate) fn pop(&self) -> Option<f32> {
         loop {
-            let rp = self.read_pos.load(Ordering::Acquire);
-            let wp = self.write_pos.load(Ordering::Acquire);
+            let rp = self.read_pos.0.load(Ordering::Acquire);
+            let wp = self.write_pos.0.load(Ordering::Acquire);
 
             if rp >= wp {
                 return None;
@@ -69,6 +73,7 @@ impl Shared {
             // past rp, CAS fails and we retry from the new position.
             if self
                 .read_pos
+                .0
                 .compare_exchange_weak(rp, rp + 1, Ordering::Release, Ordering::Relaxed)
                 .is_ok()
             {
@@ -92,8 +97,8 @@ impl Shared {
     }
 
     pub(crate) fn available(&self) -> usize {
-        let wp = self.write_pos.load(Ordering::Acquire);
-        let rp = self.read_pos.load(Ordering::Acquire);
+        let wp = self.write_pos.0.load(Ordering::Acquire);
+        let rp = self.read_pos.0.load(Ordering::Acquire);
         wp.saturating_sub(rp)
     }
 

@@ -14,7 +14,7 @@ Lock-free SPSC (single-producer, single-consumer) ring buffer that **overwrites 
 ```rust
 use rt_ring::{new, Producer, Consumer};
 
-let (mut producer, mut consumer) = rt_ring::new(1024);
+let (producer, consumer) = rt_ring::new(1024);
 
 // Producer side (e.g., audio input callback)
 producer.push(0.5);
