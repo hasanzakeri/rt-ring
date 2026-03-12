@@ -12,12 +12,26 @@ fn op_strategy() -> impl Strategy<Value = Op> {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(10_000))]
+    #![proptest_config({
+        let mut cfg = ProptestConfig::default();
+
+        // Miri runs tests under "isolation" where `getcwd` is not available.
+        // Proptest's default failure persistence uses `current_dir()` to locate/write
+        // its regressions file, so disable persistence only under Miri.
+        if cfg!(miri) {
+            cfg.failure_persistence = None;
+        }
+
+        // Miri is *very* slow; keep CI times reasonable.
+        cfg.cases = if cfg!(miri) { 20 } else { 10_000 };
+
+        cfg
+    })]
 
     #[test]
     fn matches_reference_model(
         capacity in 1usize..=64,
-        ops in prop::collection::vec(op_strategy(), 0..=500),
+        ops in prop::collection::vec(op_strategy(), 0..=if cfg!(miri) { 50 } else { 500 }),
     ) {
         let (p, c) = rt_ring::new(capacity);
         let actual_cap = p.capacity();
