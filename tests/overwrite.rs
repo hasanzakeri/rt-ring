@@ -1,6 +1,16 @@
 use std::collections::VecDeque;
 
 #[test]
+fn producer_overwrite_count_matches_consumer() {
+    let (p, c) = rt_ring::new(4);
+    for i in 0..10 {
+        p.push(i as f32);
+    }
+    assert_eq!(p.overwrite_count(), 6);
+    assert_eq!(p.overwrite_count(), c.overwrite_count());
+}
+
+#[test]
 fn overwrite_one_past_capacity() {
     // capacity = 4
     let (p, c) = rt_ring::new(4);
