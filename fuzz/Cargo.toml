@@ -1,0 +1,18 @@
+[package]
+name = "rt-ring-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+rt-ring = { path = ".." }
+
+[[bin]]
+name = "push_pop"
+path = "fuzz_targets/push_pop.rs"
+test = false
+doc = false
