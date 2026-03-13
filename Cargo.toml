@@ -2,11 +2,14 @@
 name = "rt-ring"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.65"
 description = "Lock-free SPSC ring buffer with overwrite-oldest semantics for real-time applications"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/hasanzakeri/rt-ring"
+readme = "README.md"
 keywords = ["ring-buffer", "spsc", "lock-free", "real-time", "audio"]
 categories = ["concurrency", "data-structures"]
-publish = false   # remove this line once license is chosen and added
+exclude = ["fuzz/", ".githooks/", ".github/", ".vscode/", "benches/"]
 
 [features]
 loom-tests = []

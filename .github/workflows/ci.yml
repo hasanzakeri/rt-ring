@@ -50,6 +50,15 @@ jobs:
           components: miri
       - run: cargo miri test
 
+  msrv:
+    name: MSRV (1.65)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.65.0
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check
+
   loom:
     name: Loom
     runs-on: ubuntu-latest
