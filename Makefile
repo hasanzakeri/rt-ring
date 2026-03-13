@@ -1,42 +1,29 @@
-DC = docker compose run --rm dev
+.PHONY: setup test clippy fmt fmt-check bench test-loom fuzz ci
 
-.PHONY: build test clippy fmt fmt-check bench fuzz ci clean shell
-
-# Automatically configure git hooks on first make invocation
--include .hooks-installed
-.hooks-installed:
+setup:
+	@echo "Configuring git hooks..."
 	@git config core.hooksPath .githooks
-	@touch .hooks-installed
+	@echo "Done."
 
-build: .hooks-installed
-	$(DC) cargo build
+test:
+	cargo test
 
-test: .hooks-installed
-	$(DC) cargo test
+clippy:
+	cargo clippy -- -D warnings
 
-clippy: .hooks-installed
-	$(DC) cargo clippy -- -D warnings
+fmt:
+	cargo fmt
 
-fmt: .hooks-installed
-	$(DC) cargo fmt
+fmt-check:
+	cargo fmt -- --check
 
-fmt-check: .hooks-installed
-	$(DC) cargo fmt -- --check
+bench:
+	cargo bench
 
-bench: .hooks-installed
-	$(DC) cargo bench
+test-loom:
+	cargo test --features loom-tests --test loom_spsc
 
-test-loom: .hooks-installed
-	$(DC) cargo test --features loom-tests --test loom_spsc
-
-fuzz: .hooks-installed
-	$(DC) cargo +nightly fuzz run push_pop -- -max_total_time=600
+fuzz:
+	cargo +nightly fuzz run push_pop -- -max_total_time=600
 
 ci: clippy fmt-check test
-
-clean:
-	docker compose down -v
-	@rm -f .hooks-installed
-
-shell: .hooks-installed
-	$(DC) bash
